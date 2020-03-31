@@ -1,0 +1,29 @@
+{
+    "name": "aws-deploy-trial",
+    "version": "1.0.0",
+    "description": "",
+    "main": "test.js",
+    "devDependencies": {
+        "eslint": "^6.8.0",
+        "eslint-plugin-mocha": "^6.3.0",
+        "husky": "^4.2.3",
+        "lint-staged": "^10.1.0",
+        "mocha": "^7.1.1",
+        "prettier": "^2.0.2",
+        "selenium-webdriver": "^4.0.0-alpha.7"
+    },
+    "scripts": {
+        "test": "mocha",
+        "lint": "eslint --fix ./*/**.js",
+        "prettier": "prettier --write ./*/**.js package.json .eslintrc .prettierrc"
+    },
+    "husky": {
+        "hooks": {
+            "pre-commit": "lint-staged"
+        }
+    },
+    "lint-staged": {
+        "*.js": "eslint --cache --fix",
+        "*.{js,css,md,json}": "prettier --write"
+    }
+}

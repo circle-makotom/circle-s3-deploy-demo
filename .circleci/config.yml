@@ -1,0 +1,105 @@
+version: 2.1
+
+orbs:
+  aws-s3: circleci/aws-s3@1.0.15
+
+jobs:
+  build:
+    docker:
+      - image: archlinux:latest
+    steps:
+      - run:
+          name: Building the app
+          command: |
+            echo "
+            <!doctype html>
+            <html lang=\"en\">
+            <meta charset=\"UTF-8\">
+            <title>Meow</title>
+
+            <style>
+            div#meows {
+              font-size: 200%;
+            }
+            </style>
+
+            <script>
+            window.addEventListener('DOMContentLoaded', () => {
+              const meows = document.querySelector('div#meows');
+
+              document.querySelector('button#meowBtn').addEventListener('click', () => {
+                meows.appendChild(document.createTextNode('🐈'));
+              });
+            });
+            </script>
+
+            <div id="meows">🐈</div>
+            <p><button id="meowBtn">More meows</button></p>
+            <p>Built at $(date)</p>" > index.html
+      - store_artifacts:
+          path: index.html
+      - persist_to_workspace:
+          root: ./
+          paths:
+            - ./
+
+  test:
+    docker:
+      - image: circleci/node:latest-browsers
+    parallelism: 2
+    steps:
+      - checkout
+      - attach_workspace:
+          at: dist
+      - restore_cache:
+          keys:
+            - node-{{ arch }}-{{ checksum "package-lock.json" }}
+            - node-{{ arch }}
+      - run: npm i
+      - run: npx mocha $(circleci tests glob "tests/**/*.js" | circleci tests split)
+      - save_cache:
+          paths:
+            - node_modules
+          key: node-{{ arch }}-{{ checksum "package-lock.json" }}
+
+  validate:
+    docker:
+      - image: validator/validator:latest
+    steps:
+      - run: apt update
+      - run: apt -y install ca-certificates
+      - attach_workspace:
+          at: ./
+      - run: /vnu-runtime-image/bin/vnu dist/**/*.html
+
+  deploy:
+    docker:
+      - image: cimg/python:3.8
+    steps:
+      - attach_workspace:
+          at: dist
+      - aws-s3/copy:
+          arguments: --acl public-read
+          from: dist/*
+          to: $TARGET_S3_BUCKET
+
+workflows:
+  version: 2
+  build-test-deploy:
+    jobs:
+      - build
+      - test:
+          requires:
+            - build
+      - validate:
+          requires:
+            - build
+      - hold:
+          type: approval
+          requires:
+            - test
+            - validate
+      - deploy:
+          requires:
+            - hold
+          context: aws-deploy-demo
